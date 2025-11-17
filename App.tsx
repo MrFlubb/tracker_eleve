@@ -6,10 +6,12 @@ import Spinner from './components/Spinner';
 import ErrorMessage from './components/ErrorMessage';
 import MonthlySummary from './components/MonthlySummary';
 import DailyBreakdown from './components/DailyBreakdown';
+import { AcademicCapIcon, BeakerIcon, CurrencyEuroIcon, RefreshIcon, SpinnerIcon, UsersIcon } from './components/icons';
 
 const WEBHOOK_URL = 'https://workflow.aurelienchardon.com/webhook/nbeleve';
 const ADD_STUDENT_5E_URL = 'https://workflow.aurelienchardon.com/webhook/eleve5e';
 const ADD_STUDENT_7E_URL = 'https://workflow.aurelienchardon.com/webhook/eleve7e';
+const CANCEL_ADD_STUDENT_URL = 'https://workflow.aurelienchardon.com/webhook/annulerajouteleve';
 
 const App: React.FC = () => {
   const [data, setData] = useState<WebhookData | null>(null);
@@ -18,7 +20,7 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [isAddingStudent, setIsAddingStudent] = useState<boolean>(false);
+  const [actionInProgress, setActionInProgress] = useState<'add' | 'cancel' | null>(null);
 
   const fetchData = useCallback(async () => {
     // Ne pas remettre à true si on fait un refresh en arrière plan
@@ -101,15 +103,15 @@ const App: React.FC = () => {
   }, [fetchData]);
 
   const handleAddStudent = async (url: string) => {
-    setIsAddingStudent(true);
+    setActionInProgress('add');
     setError(null);
     try {
-      const response = await fetch(url, { method: 'POST' });
+      const response = await fetch(url, { method: 'GET' });
       if (!response.ok) {
-        throw new Error(`La requête a échoué: ${response.statusText}`);
+        throw new Error(`Le serveur a répondu avec le statut ${response.status}`);
       }
-      // Use a small delay to allow n8n to process the data
-      setTimeout(fetchData, 500); 
+      // Success, refetch data
+      setTimeout(fetchData, 500);
     } catch (err) {
       if (err instanceof Error) {
         setError(`Action impossible : ${err.message}`);
@@ -117,7 +119,28 @@ const App: React.FC = () => {
         setError("Une erreur inconnue est survenue lors de l'action.");
       }
     } finally {
-      setIsAddingStudent(false);
+      setActionInProgress(null);
+    }
+  };
+
+  const handleCancelStudent = async () => {
+    setActionInProgress('cancel');
+    setError(null);
+    try {
+      const response = await fetch(CANCEL_ADD_STUDENT_URL, { method: 'GET' });
+      if (!response.ok) {
+        throw new Error(`Le serveur a répondu avec le statut ${response.status}`);
+      }
+       // Success, refetch data
+      setTimeout(fetchData, 500);
+    } catch (err) {
+      if (err instanceof Error) {
+        setError(`Impossible d'annuler : ${err.message}`);
+      } else {
+        setError("Une erreur inconnue est survenue lors de l'annulation.");
+      }
+    } finally {
+      setActionInProgress(null);
     }
   };
 
@@ -168,7 +191,7 @@ const App: React.FC = () => {
             )}
             <button
               onClick={() => fetchData()}
-              disabled={loading || isAddingStudent}
+              disabled={loading || !!actionInProgress}
               className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 disabled:bg-slate-800 disabled:cursor-not-allowed text-white rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-900"
             >
               <RefreshIcon spinning={loading && !!data} />
@@ -179,9 +202,9 @@ const App: React.FC = () => {
 
         <main>
           {loading && !data && <Spinner />}
-          {error && <ErrorMessage message={error} onRetry={fetchData} />}
+          {error && <ErrorMessage message={error} onRetry={actionInProgress === 'cancel' ? handleCancelStudent : fetchData} />}
           
-          {data && (
+          {data && !error && (
             <>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {cardData.map(card => (
@@ -201,10 +224,10 @@ const App: React.FC = () => {
                 <div className="flex flex-row gap-4">
                   <button
                     onClick={() => handleAddStudent(ADD_STUDENT_5E_URL)}
-                    disabled={isAddingStudent}
+                    disabled={!!actionInProgress}
                     className="flex-1 justify-center py-6 text-4xl bg-indigo-500/20 hover:bg-indigo-500/40 border border-indigo-500/50 hover:border-indigo-500/80 disabled:bg-slate-800 disabled:border-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed text-indigo-200 font-extrabold rounded-lg transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-900 shadow-lg hover:shadow-indigo-500/20 hover:-translate-y-1 disabled:transform-none disabled:shadow-none"
                   >
-                    {isAddingStudent ? (
+                    {actionInProgress === 'add' ? (
                       <span className="flex items-center justify-center text-base">
                         <SpinnerIcon /> Ajout...
                       </span>
@@ -214,10 +237,10 @@ const App: React.FC = () => {
                   </button>
                   <button
                     onClick={() => handleAddStudent(ADD_STUDENT_7E_URL)}
-                    disabled={isAddingStudent}
+                    disabled={!!actionInProgress}
                     className="flex-1 justify-center py-6 text-4xl bg-purple-500/20 hover:bg-purple-500/40 border border-purple-500/50 hover:border-purple-500/80 disabled:bg-slate-800 disabled:border-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed text-purple-200 font-extrabold rounded-lg transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-offset-2 focus:ring-offset-slate-900 shadow-lg hover:shadow-purple-500/20 hover:-translate-y-1 disabled:transform-none disabled:shadow-none"
                   >
-                    {isAddingStudent ? (
+                    {actionInProgress === 'add' ? (
                        <span className="flex items-center justify-center text-base">
                         <SpinnerIcon /> Ajout...
                       </span>
@@ -226,6 +249,29 @@ const App: React.FC = () => {
                     )}
                   </button>
                 </div>
+              </div>
+              
+              <div className="flex justify-center mt-2">
+                <button
+                  onClick={handleCancelStudent}
+                  disabled={!!actionInProgress}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-400 rounded-md hover:bg-slate-700/50 hover:text-red-400 disabled:text-slate-600 disabled:cursor-not-allowed transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-slate-600 focus:ring-offset-2 focus:ring-offset-slate-900"
+                  aria-label="Annuler le dernier ajout"
+                >
+                  {actionInProgress === 'cancel' ? (
+                    <>
+                      <SpinnerIcon className="animate-spin h-4 w-4" />
+                      <span>Annulation...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      <span>Annuler le dernier ajout</span>
+                    </>
+                  )}
+                </button>
               </div>
 
               <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -244,51 +290,5 @@ const App: React.FC = () => {
     </div>
   );
 };
-
-// --- SVG Icons ---
-
-const SpinnerIcon: React.FC = () => (
-    <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-    </svg>
-);
-
-const CurrencyEuroIcon: React.FC = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M14.121 15.536A9.004 9.004 0 0112 16a9 9 0 115.879-15.879m-5.879 15.879l-5.88-5.88m5.88 5.88l-1.293-1.293m0 0a2.25 2.25 0 013.182 0l2.687 2.687a2.25 2.25 0 010 3.182l-1.293 1.293a2.25 2.25 0 01-3.182 0l-2.687-2.687a2.25 2.25 0 010-3.182z" />
-  </svg>
-);
-
-const AcademicCapIcon: React.FC = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path d="M12 14l9-5-9-5-9 5 9 5z" />
-    <path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-5.998 12.078 12.078 0 01.665-6.479L12 14z" />
-    <path strokeLinecap="round" strokeLinejoin="round" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-5.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222 4 2.222V20M1 12v7a2 2 0 002 2h18a2 2 0 002-2v-7" />
-  </svg>
-);
-
-const BeakerIcon: React.FC = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547a2 2 0 00-.547 1.806l.477 2.387a6 6 0 00.517 3.86l.158.318a6 6 0 003.86.517l2.387.477a2 2 0 001.806-.547a2 2 0 00.547-1.806l-.477-2.387a6 6 0 00-.517-3.86l-.158-.318a6 6 0 01-.517-3.86l.477-2.387a2 2 0 01.547-1.806z" />
-    <path strokeLinecap="round" strokeLinejoin="round" d="M14.25 10.25l1.586-1.586a2 2 0 00-2.828-2.828l-1.586 1.586a2 2 0 002.828 2.828z" />
-  </svg>
-);
-
-const UsersIcon: React.FC = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-  </svg>
-);
-
-interface RefreshIconProps {
-  spinning: boolean;
-}
-const RefreshIcon: React.FC<RefreshIconProps> = ({ spinning }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${spinning ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h5M20 20v-5h-5M20 4h-5v5M4 20h5v-5" />
-    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h5m11 11v-5h-5m0 0l-1.293-1.293a2 2 0 00-2.828 0L4 20m16-16l-1.293 1.293a2 2 0 000 2.828l1.293 1.293M4 4h5v5m11 11h-5v-5m0 0l-1.293 1.293a2 2 0 01-2.828 0L4 4" />
-  </svg>
-);
 
 export default App;
