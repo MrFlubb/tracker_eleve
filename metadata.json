@@ -1,5 +1,5 @@
 {
-  "name": "Tableau de Bord Soirée Étudiante",
+  "name": "Tracker d'élèves",
   "description": "Une interface épurée pour visualiser en temps réel les statistiques financières et le nombre de participants d'une soirée étudiante, en se basant sur les données d'un webhook.",
   "requestFramePermissions": []
 }

@@ -23,10 +23,7 @@ const App: React.FC = () => {
   const [actionInProgress, setActionInProgress] = useState<'add' | 'cancel' | null>(null);
 
   const fetchData = useCallback(async () => {
-    // Ne pas remettre à true si on fait un refresh en arrière plan
-    if (!data) {
-      setLoading(true);
-    }
+    setLoading(true);
     setError(null);
     try {
       const response = await fetch(`${WEBHOOK_URL}?t=${new Date().getTime()}`);
@@ -94,12 +91,11 @@ const App: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [data]);
+  }, []);
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 60000); // Refresh every 60 seconds
-    return () => clearInterval(interval);
+    // Suppression du setInterval pour éviter les appels automatiques et les boucles infinies
   }, [fetchData]);
 
   const handleAddStudent = async (url: string) => {
